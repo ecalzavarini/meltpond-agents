@@ -1,8 +1,13 @@
 globals[
-  ;mean-ice-height
-  ;smooth-cycles
+  ;mean-ice-height is defined via the GUI
+  ;smooth-cycles   is defined via the GUI
   density-ratio
-  melted-volume
+  melt-rate
+  melt-rate-pond
+
+  ;; physical parameters for the model
+  time-step
+  space-step
 ]
 
 breed[drops drop]
@@ -16,10 +21,21 @@ patches-own[ice water]
 drops-own[water-content]
 
 
+;; we affect the global physical parameters that are relevant for the model
+to startup
+  set time-step 0.25  ; expressed in days
+  set space-step 1.0  ; the lateral size of a patch expressed in cm
+
+  set melt-rate 1.0  ;in cm of ice per day
+  set melt-rate-pond (melt-rate * 5.0) ; nominal value, check the literature
+  set density-ratio 0.9 ;ratio between ice and water mass densities
+end
+
 
 ; generate a random smooth topography
 to draw-map
   clear-all
+  startup
    ask patches
   [
   set ice random-float (2 * mean-ice-height)
@@ -82,16 +98,27 @@ end
 ; melt ice
 to melt-ice
   ifelse ice > 0 [
-    ;let actual-melted-volume  ( melted-volume / ice )  ;this implement conductive melting
-    let actual-melted-volume  ( melted-volume  + water * 0.1 ) ; effect of ponds : water enahnces melting
-    if (any? neighbors4 with [water > 0]) [
-      let water-occurrence count neighbors4 with [water > 0]
-      set actual-melted-volume actual-melted-volume + (melted-volume * water-occurrence)
+    ;; VERTICAL MELTING
+    ;; 1) the following line implements conductive melting of ice
+    let actual-melted-volume  melt-rate * time-step ;shall be corrected to include Stefan effect, see line below
+    ;let actual-melted-volume  ( melt-rate * time-step / ice )
+    ;; 2) the following line implements the increased melt-rate for pondend ice : water enahnces melting
+    if water > 0 [
+      set actual-melted-volume melt-rate-pond * time-step
     ]
+    ;; LATERAL MELTING
+    ;; 3) the following block allows for increased melting due to lateral contribution of ponds
+    ;let water-here water
+    ;if (any? neighbors4 with [water > water-here]) [
+    ;  ;let water-occurrence count neighbors4 with [water > 0]
+    ;  ;set actual-melted-volume actual-melted-volume + (melt-rate * water-occurrence)
+    ;  let water-coverage sum [water - water-here] of neighbors4 with [water > water-here]
+    ;  set actual-melted-volume actual-melted-volume + (melt-rate-pond * water-coverage / space-step * time-step)
+    ;]
     set ice (ice - actual-melted-volume ) ; melt has occurred
     sprout-drops 1 [
       set water-content (actual-melted-volume  * density-ratio)  ; the melted water is put into a pocket
-      ;pen-down
+      ifelse pen-down? [pen-down][pen-up]
     ]
   ][
     set ice 0
@@ -119,18 +146,8 @@ to discharge
 end
 
 
-; we define the global parameters that are relevant for the melting process
-to startup
-  set melted-volume 1.0  ;in cm per tick
-  set density-ratio 0.9
-end
-
-
 ; this is the procedure for the loop over time
 to melt-and-flow
-
-  startup
-
   ask patches[
     ; melt the ice
     melt-ice]
@@ -234,7 +251,7 @@ smooth-cycles
 smooth-cycles
 0
 40
-4.0
+9.0
 1
 1
 NIL
@@ -278,7 +295,7 @@ true
 true
 "set-plot-x-range 0 (mean-ice-height * 2)\n;set-plot-y-range 0 100\n;set-histogram-num-bars 7\n" ""
 PENS
-"ice" 1.0 0 -11053225 true "" "histogram [ice] of patches with [ice > 0]"
+"ice" 1.0 0 -7500403 true "" "histogram [ice] of patches with [ice > 0]"
 
 TEXTBOX
 757
@@ -326,7 +343,7 @@ true
 true
 ";set-plot-x-range 0 (mean-ice-height * 2)\n;set-plot-y-range 0 100" ""
 PENS
-"water" 1.0 0 -14070903 true "" "histogram [water] of patches with [water > 0]"
+"water" 1.0 0 -13345367 true "" "histogram [water] of patches with [water > 0]"
 
 BUTTON
 15
@@ -361,7 +378,7 @@ true
 true
 "set-plot-y-range 0 mean-ice-height" ""
 PENS
-"ice" 1.0 0 -16777216 true "" "plot compute-mean-ice"
+"ice" 1.0 0 -7500403 true "" "plot compute-mean-ice"
 "water" 1.0 0 -13345367 true "" "plot compute-mean-water"
 
 TEXTBOX
@@ -401,17 +418,17 @@ true
 true
 "" ""
 PENS
-"water" 1.0 0 -16777216 true "" "plot 100 * (count patches with [water > 0]) / count patches"
+"water" 1.0 0 -13345367 true "" "plot 100 * (count patches with [water > 0]) / count patches"
 "ice" 1.0 0 -7500403 true "" "plot 100 * (count patches with [ice > 0] ) / count patches"
 "holes" 1.0 0 -2674135 true "" "plot 100 * (count patches with [ice = 0] ) / count patches"
 
 MONITOR
 1061
 554
-1216
+1257
 599
-Time for complete melt
-ticks - 1
+Time for complete melt [days]
+(ticks - 1) * time-step
 17
 1
 11
@@ -438,25 +455,25 @@ SWITCH
 162
 smooth-with-radius?
 smooth-with-radius?
-0
+1
 1
 -1000
 
 TEXTBOX
-23
-390
-173
-418
+22
+347
+172
+375
 2) run the simulation 
 11
 95.0
 1
 
 TEXTBOX
-65
-406
-215
-424
+64
+363
+214
+381
 step-by-step
 11
 15.0
@@ -488,6 +505,17 @@ NIL
 NIL
 NIL
 1
+
+SWITCH
+15
+383
+195
+416
+pen-down?
+pen-down?
+1
+1
+-1000
 
 @#$#@#$#@
 # SUMMER MELTING OF ARCTIC SEA-ICE SHEETS 
