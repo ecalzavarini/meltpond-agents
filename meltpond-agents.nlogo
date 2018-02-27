@@ -84,6 +84,10 @@ to melt-ice
   ifelse ice > 0 [
     ;let actual-melted-volume  ( melted-volume / ice )  ;this implement conductive melting
     let actual-melted-volume  ( melted-volume  + water * 0.1 ) ; effect of ponds : water enahnces melting
+    if (any? neighbors4 with [water > 0]) [
+      let water-occurrence count neighbors4 with [water > 0]
+      set actual-melted-volume actual-melted-volume + (melted-volume * water-occurrence)
+    ]
     set ice (ice - actual-melted-volume ) ; melt has occurred
     sprout-drops 1 [
       set water-content (actual-melted-volume  * density-ratio)  ; the melted water is put into a pocket
@@ -165,11 +169,11 @@ end
 GRAPHICS-WINDOW
 210
 10
-720
-521
+722
+523
 -1
 -1
-2.0
+4.0
 1
 10
 1
@@ -180,9 +184,9 @@ GRAPHICS-WINDOW
 1
 1
 0
-250
+125
 0
-250
+125
 1
 1
 1
@@ -230,7 +234,7 @@ smooth-cycles
 smooth-cycles
 0
 40
-12.0
+4.0
 1
 1
 NIL
@@ -325,10 +329,10 @@ PENS
 "water" 1.0 0 -14070903 true "" "histogram [water] of patches with [water > 0]"
 
 BUTTON
-19
-356
-200
-389
+15
+423
+196
+456
 NIL
 melt-and-flow
 NIL
@@ -421,7 +425,7 @@ smooth-radius
 smooth-radius
 0
 10
-6.5
+4.0
 0.5
 1
 NIL
@@ -439,40 +443,40 @@ smooth-with-radius?
 -1000
 
 TEXTBOX
-27
-323
-177
-351
+23
+390
+173
+418
 2) run the simulation 
 11
 95.0
 1
 
 TEXTBOX
-69
-339
-219
-357
+65
+406
+215
+424
 step-by-step
 11
 15.0
 1
 
 TEXTBOX
-53
-400
-203
-418
+49
+467
+199
+485
 complete simulation
 11
 15.0
 1
 
 BUTTON
-18
-423
-201
-456
+14
+490
+197
+523
 NIL
 melt-and-flow
 T
