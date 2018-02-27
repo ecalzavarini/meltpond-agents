@@ -27,7 +27,7 @@ to startup
   set space-step 1.0  ; the lateral size of a patch expressed in cm
 
   set melt-rate 1.0  ;in cm of ice per day
-  set melt-rate-pond (melt-rate * 5.0) ; nominal value, check the literature
+  set melt-rate-pond melt-rate + 3.0 ; nominal value, check the literature
   set density-ratio 0.9 ;ratio between ice and water mass densities
 end
 
@@ -108,13 +108,66 @@ to melt-ice
     ]
     ;; LATERAL MELTING
     ;; 3) the following block allows for increased melting due to lateral contribution of ponds
-    ;let water-here water
-    ;if (any? neighbors4 with [water > water-here]) [
-    ;  ;let water-occurrence count neighbors4 with [water > 0]
-    ;  ;set actual-melted-volume actual-melted-volume + (melt-rate * water-occurrence)
-    ;  let water-coverage sum [water - water-here] of neighbors4 with [water > water-here]
-    ;  set actual-melted-volume actual-melted-volume + (melt-rate-pond * water-coverage / space-step * time-step)
-    ;]
+    if lateral-melting? [
+    let water-coverage 0.0
+    let air-coverage 0.0
+
+    let pnext patch-at 0 1
+    if ([ice] of pnext < ice)[
+      ifelse ([water] of pnext = 0)[
+        set air-coverage air-coverage + (ice - [ice] of pnext)
+      ][
+        ifelse ([ice + water] of pnext < ice)[
+          set water-coverage water-coverage + ([water] of pnext)
+        ][
+          set water-coverage water-coverage + (ice - ([ice] of pnext))
+        ]
+      ]
+    ]
+
+    set pnext patch-at 0 -1
+      if ([ice] of pnext < ice)[
+      ifelse ([water] of pnext = 0)[
+        set air-coverage air-coverage + (ice - [ice] of pnext)
+      ][
+        ifelse ([ice + water] of pnext < ice)[
+          set water-coverage water-coverage + ([water] of pnext)
+        ][
+          set water-coverage water-coverage + (ice - ([ice] of pnext))
+        ]
+      ]
+    ]
+
+    set pnext patch-at 1 0
+       if ([ice] of pnext < ice)[
+      ifelse ([water] of pnext = 0)[
+        set air-coverage air-coverage + (ice - [ice] of pnext)
+      ][
+        ifelse ([ice + water] of pnext < ice)[
+          set water-coverage water-coverage + ([water] of pnext)
+        ][
+          set water-coverage water-coverage + (ice - ([ice] of pnext))
+        ]
+      ]
+    ]
+
+    set pnext patch-at -1 0
+        if ([ice] of pnext < ice)[
+      ifelse ([water] of pnext = 0)[
+        set air-coverage air-coverage + (ice - [ice] of pnext)
+      ][
+        ifelse ([ice + water] of pnext < ice)[
+          set water-coverage water-coverage + ([water] of pnext)
+        ][
+          set water-coverage water-coverage + (ice - ([ice] of pnext))
+        ]
+      ]
+    ]
+
+    set actual-melted-volume actual-melted-volume + (melt-rate * air-coverage / space-step * time-step) + (melt-rate-pond * water-coverage / space-step * time-step)
+    ]
+    ;; end of lateral melting
+
     set ice (ice - actual-melted-volume ) ; melt has occurred
     sprout-drops 1 [
       set water-content (actual-melted-volume  * density-ratio)  ; the melted water is put into a pocket
@@ -135,6 +188,7 @@ to flow
       move-to p
     ][
      set water (water + water-content) ; the pocket of melted water has reached a minimum height and it remains there
+      if ice = 0 [set water 0]
      die
   ]
   ]
@@ -251,7 +305,7 @@ smooth-cycles
 smooth-cycles
 0
 40
-9.0
+4.0
 1
 1
 NIL
@@ -513,6 +567,17 @@ SWITCH
 416
 pen-down?
 pen-down?
+1
+1
+-1000
+
+SWITCH
+258
+565
+412
+598
+lateral-melting?
+lateral-melting?
 1
 1
 -1000
