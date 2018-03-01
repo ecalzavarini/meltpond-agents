@@ -4,6 +4,9 @@ globals[
   density-ratio
   melt-rate
   melt-rate-pond
+  melt-rate-pond-lateral
+  seepage-rate
+
 
   ;; physical parameters for the model
   time-step
@@ -26,14 +29,26 @@ to startup
   set time-step 0.25  ; expressed in days
   set space-step 1.0  ; the lateral size of a patch expressed in cm
 
-  set melt-rate 1.0  ;in cm of ice per day
-  set melt-rate-pond melt-rate + 3.0 ; nominal value, check the literature
+  set melt-rate 1.2  ;in cm of ice per day
+  ifelse melt-ponds? [
+    set melt-rate-pond melt-rate + 0.8 ; nominal value, check the literature
+    set melt-rate-pond-lateral melt-rate-pond
+  ][
+    set melt-rate-pond melt-rate
+    set melt-rate-pond-lateral melt-rate
+  ]
   set density-ratio 0.9 ;ratio between ice and water mass densities
+
+  ifelse seepage? [
+  set seepage-rate 0.8 ; in cm / day
+  ][
+  set seepage-rate 0.0 ; in cm / day
+  ]
 end
 
 
 ; generate a random smooth topography
-to draw-map
+to setup-topography
   clear-all
   startup
    ask patches
@@ -83,11 +98,11 @@ to color-field
   ifelse water > 0 [
     set pcolor scale-color blue (2. * mean-ice-height * density-ratio - water) 0 (2. * mean-ice-height * density-ratio)
   ][
-  if ice > 0 [set pcolor scale-color cyan ice -10 (2 * mean-ice-height)]
+  if ice > 0 [set pcolor scale-color grey ice -10 (2 * mean-ice-height)]
   ;same result as the following 2 lines
   ;let ice-color 80 + ((89.9 - 80) / (2 * mean-ice-height)) * ice
   ;set pcolor ice-color
-    if ice = 0 [set pcolor red] ;blue - 3]
+    if ice = 0 [set pcolor turquoise] ;blue - 3]
   ]
 end
 
@@ -97,86 +112,96 @@ end
 
 ; melt ice
 to melt-ice
-  ifelse ice > 0 [
+  let actual-melted-volume 0
+ if ice > 0 [
     ;; VERTICAL MELTING
+
     ;; 1) the following line implements conductive melting of ice
-    let actual-melted-volume  melt-rate * time-step ;shall be corrected to include Stefan effect, see line below
-    ;let actual-melted-volume  ( melt-rate * time-step / ice )
+    if water = 0 [
+       set actual-melted-volume  melt-rate * time-step ;shall be corrected to include Stefan effect, see line below
+      ;set actual-melted-volume  ( melt-rate * time-step / ice )
+    ]
+
     ;; 2) the following line implements the increased melt-rate for pondend ice : water enahnces melting
     if water > 0 [
       set actual-melted-volume melt-rate-pond * time-step
     ]
+
     ;; LATERAL MELTING
-    ;; 3) the following block allows for increased melting due to lateral contribution of ponds
+
+    ;; the following blocks allows for increased melting due to lateral contribution of ponds
     if lateral-melting? [
-    let water-coverage 0.0
-    let air-coverage 0.0
+      let water-coverage 0.0
+      let air-coverage 0.0
 
-    let pnext patch-at 0 1
-    if ([ice] of pnext < ice)[
-      ifelse ([water] of pnext = 0)[
-        set air-coverage air-coverage + (ice - [ice] of pnext)
-      ][
-        ifelse ([ice + water] of pnext < ice)[
-          set water-coverage water-coverage + ([water] of pnext)
-        ][
-          set water-coverage water-coverage + (ice - ([ice] of pnext))
-        ]
-      ]
-    ]
-
-    set pnext patch-at 0 -1
+      let pnext patch-at 0 1
       if ([ice] of pnext < ice)[
-      ifelse ([water] of pnext = 0)[
-        set air-coverage air-coverage + (ice - [ice] of pnext)
-      ][
-        ifelse ([ice + water] of pnext < ice)[
-          set water-coverage water-coverage + ([water] of pnext)
+        ifelse ([water] of pnext = 0)[
+          set air-coverage air-coverage + (ice - [ice] of pnext)
         ][
-          set water-coverage water-coverage + (ice - ([ice] of pnext))
+          ifelse ([ice + water] of pnext < ice)[
+            set water-coverage water-coverage + ([water] of pnext)
+          ][
+            set water-coverage water-coverage + (ice - ([ice] of pnext))
+          ]
         ]
       ]
-    ]
 
-    set pnext patch-at 1 0
-       if ([ice] of pnext < ice)[
-      ifelse ([water] of pnext = 0)[
-        set air-coverage air-coverage + (ice - [ice] of pnext)
-      ][
-        ifelse ([ice + water] of pnext < ice)[
-          set water-coverage water-coverage + ([water] of pnext)
+      set pnext patch-at 0 -1
+      if ([ice] of pnext < ice)[
+        ifelse ([water] of pnext = 0)[
+          set air-coverage air-coverage + (ice - [ice] of pnext)
         ][
-          set water-coverage water-coverage + (ice - ([ice] of pnext))
+          ifelse ([ice + water] of pnext < ice)[
+            set water-coverage water-coverage + ([water] of pnext)
+          ][
+            set water-coverage water-coverage + (ice - ([ice] of pnext))
+          ]
         ]
       ]
-    ]
 
-    set pnext patch-at -1 0
-        if ([ice] of pnext < ice)[
-      ifelse ([water] of pnext = 0)[
-        set air-coverage air-coverage + (ice - [ice] of pnext)
-      ][
-        ifelse ([ice + water] of pnext < ice)[
-          set water-coverage water-coverage + ([water] of pnext)
+      set pnext patch-at 1 0
+      if ([ice] of pnext < ice)[
+        ifelse ([water] of pnext = 0)[
+          set air-coverage air-coverage + (ice - [ice] of pnext)
         ][
-          set water-coverage water-coverage + (ice - ([ice] of pnext))
+          ifelse ([ice + water] of pnext < ice)[
+            set water-coverage water-coverage + ([water] of pnext)
+          ][
+            set water-coverage water-coverage + (ice - ([ice] of pnext))
+          ]
         ]
       ]
-    ]
 
-    set actual-melted-volume actual-melted-volume + (melt-rate * air-coverage / space-step * time-step) + (melt-rate-pond * water-coverage / space-step * time-step)
+      set pnext patch-at -1 0
+      if ([ice] of pnext < ice)[
+        ifelse ([water] of pnext = 0)[
+          set air-coverage air-coverage + (ice - [ice] of pnext)
+        ][
+          ifelse ([ice + water] of pnext < ice)[
+            set water-coverage water-coverage + ([water] of pnext)
+          ][
+            set water-coverage water-coverage + (ice - ([ice] of pnext))
+          ]
+        ]
+      ]
+
+      set actual-melted-volume actual-melted-volume + (melt-rate * air-coverage / space-step * time-step) + (melt-rate-pond-lateral * water-coverage / space-step * time-step)
     ]
     ;; end of lateral melting
 
+
+    ;; Making meting happening
+    if actual-melted-volume > ice [
+      set actual-melted-volume ice  ;this is to avoid to melt more ice than what we have
+      set water 0
+    ]
     set ice (ice - actual-melted-volume ) ; melt has occurred
     sprout-drops 1 [
-      set water-content (actual-melted-volume  * density-ratio)  ; the melted water is put into a pocket
+      set water-content (actual-melted-volume  * density-ratio)  ; the melted water is put into a pocket (a moving agent)
       ifelse pen-down? [pen-down][pen-up]
     ]
-  ][
-    set ice 0
-    set water 0
-   ]
+  ]
 end
 
 
@@ -195,10 +220,16 @@ to flow
 end
 
 ; discharge of water to the sea
-to discharge
-  if (neighbors with [ice = 0] != nobody ) [set water 0] ; discharge of water to the sea is occurred
-end
+;to discharge
+;  if any? neighbors with [ice = 0] [set water 0] ; discharge of water to the sea is occurred
+;end
 
+to seepage
+  if water > 0 [
+    set water water - seepage-rate * time-step
+    if water < 0 [set water 0]
+  ]
+end
 
 ; this is the procedure for the loop over time
 to melt-and-flow
@@ -212,10 +243,12 @@ to melt-and-flow
   ask patches[
     ; discharge metlwater
     ;discharge
+    ; seepage of meltwater
+    seepage
     color-field
   ]
 
-  if (count patches with [ice = 0] = count patches)[stop]
+  if (count patches with [ice = 0] = count patches )[stop]
 
   tick
 end
@@ -270,7 +303,7 @@ BUTTON
 198
 290
 NIL
-draw-map\n
+setup-topography\n
 NIL
 1
 T
@@ -305,7 +338,7 @@ smooth-cycles
 smooth-cycles
 0
 40
-4.0
+8.0
 1
 1
 NIL
@@ -479,9 +512,9 @@ PENS
 MONITOR
 1061
 554
-1257
+1325
 599
-Time for complete melt [days]
+Time to 100%  sea-water coverage [days]
 (ticks - 1) * time-step
 17
 1
@@ -496,7 +529,7 @@ smooth-radius
 smooth-radius
 0
 10
-4.0
+6.0
 0.5
 1
 NIL
@@ -572,13 +605,35 @@ pen-down?
 -1000
 
 SWITCH
-258
-565
-412
-598
+172
+552
+326
+585
 lateral-melting?
 lateral-melting?
 1
+1
+-1000
+
+SWITCH
+16
+552
+151
+585
+melt-ponds?
+melt-ponds?
+1
+1
+-1000
+
+SWITCH
+344
+552
+457
+585
+seepage?
+seepage?
+0
 1
 -1000
 
@@ -590,10 +645,10 @@ lateral-melting?
 This is a highly idealized (toy?) model system for the evolution of melting dynamics of sea-ice sheets in the Arctic during the summer season.
 
 ### The model is based on the follwoing hypothesis:
-1. Ice melt at a prescribed rate (described later on) and from such a phase-change process melt water is generated. Note that water has a difference mass density as compared to ice
-2. The water flows the the positions of local minima of potential energy, that is to say to positions where the sum of the ice thickness and the depth of melt water minima.
+1. Ice melt at a prescribed rate (described later on) and from this phase-change process melt water is generated. Note that water has a difference mass density as compared to ice
+2. The water flows to the positions of local minima of potential energy, that is to say to positions where the sum of the ice thickness and the depth of melt water is minimum.
 The water displacement process is assumed to occur over a time scale that is much smaller as compared to the time scale of the melting. This hypothesis allows to treat water down-slope movment as an istantaneous process.
-3. When the ice thickness becomes zero, the melt water at the same location is taken out from the system. This feature of the model reproduces the. 
+3. When the ice thickness becomes zero, the melt water at the same location is taken out from the system. This feature of the model reproduces the discharge of fresh water at sea. 
 
 
 ## HOW IT WORKS
