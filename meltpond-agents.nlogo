@@ -127,69 +127,6 @@ to melt-ice
       set actual-melted-volume melt-rate-pond * time-step
     ]
 
-    ;; LATERAL MELTING
-
-    ;; the following blocks allows for increased melting due to lateral contribution of ponds
-    if lateral-melting? [
-      let water-coverage 0.0
-      let air-coverage 0.0
-
-      let pnext patch-at 0 1
-      if ([ice] of pnext < ice)[
-        ifelse ([water] of pnext = 0)[
-          set air-coverage air-coverage + (ice - [ice] of pnext)
-        ][
-          ifelse ([ice + water] of pnext < ice)[
-            set water-coverage water-coverage + ([water] of pnext)
-          ][
-            set water-coverage water-coverage + (ice - ([ice] of pnext))
-          ]
-        ]
-      ]
-
-      set pnext patch-at 0 -1
-      if ([ice] of pnext < ice)[
-        ifelse ([water] of pnext = 0)[
-          set air-coverage air-coverage + (ice - [ice] of pnext)
-        ][
-          ifelse ([ice + water] of pnext < ice)[
-            set water-coverage water-coverage + ([water] of pnext)
-          ][
-            set water-coverage water-coverage + (ice - ([ice] of pnext))
-          ]
-        ]
-      ]
-
-      set pnext patch-at 1 0
-      if ([ice] of pnext < ice)[
-        ifelse ([water] of pnext = 0)[
-          set air-coverage air-coverage + (ice - [ice] of pnext)
-        ][
-          ifelse ([ice + water] of pnext < ice)[
-            set water-coverage water-coverage + ([water] of pnext)
-          ][
-            set water-coverage water-coverage + (ice - ([ice] of pnext))
-          ]
-        ]
-      ]
-
-      set pnext patch-at -1 0
-      if ([ice] of pnext < ice)[
-        ifelse ([water] of pnext = 0)[
-          set air-coverage air-coverage + (ice - [ice] of pnext)
-        ][
-          ifelse ([ice + water] of pnext < ice)[
-            set water-coverage water-coverage + ([water] of pnext)
-          ][
-            set water-coverage water-coverage + (ice - ([ice] of pnext))
-          ]
-        ]
-      ]
-
-      set actual-melted-volume actual-melted-volume + (melt-rate * air-coverage / space-step * time-step) + (melt-rate-pond-lateral * water-coverage / space-step * time-step)
-    ]
-    ;; end of lateral melting
-
 
     ;; Making meting happening
     if actual-melted-volume > ice [
@@ -199,6 +136,9 @@ to melt-ice
     set ice (ice - actual-melted-volume ) ; melt has occurred
     sprout-drops 1 [
       set water-content (actual-melted-volume  * density-ratio)  ; the melted water is put into a pocket (a moving agent)
+      ;; seepage of meltwater
+      set water-content water-content - (seepage-rate * time-step)
+      if water-content < 0 [set water-content 0]
       ifelse pen-down? [pen-down][pen-up]
     ]
   ]
@@ -208,7 +148,7 @@ end
 ; move drops till conversion into water
 to flow
   loop[
-  let p min-one-of neighbors4 [ice + water]
+  let p min-one-of neighbors [ice + water]
    ifelse (ice + water) >  [ice + water] of p [
       move-to p
     ][
@@ -252,8 +192,6 @@ to melt-and-flow
   ask patches[
     ;; melt the ice
     melt-ice
-    ;; seepage of meltwater
-    seepage
   ]
   ask drops [
     ;; move water
@@ -339,8 +277,8 @@ SLIDER
 mean-ice-height
 mean-ice-height
 0
-100
-59.0
+400
+92.0
 1
 1
 cm
@@ -355,7 +293,7 @@ smooth-cycles
 smooth-cycles
 0
 40
-6.0
+3.0
 1
 1
 NIL
@@ -384,10 +322,10 @@ compute-std-ice
 11
 
 PLOT
-756
-82
-1011
-275
+1050
+100
+1326
+308
 Histogram ice
 [cm]
 NIL
@@ -400,6 +338,7 @@ true
 "set-plot-x-range 0 (mean-ice-height * 2)\n;set-plot-y-range 0 100\n;set-histogram-num-bars 7\n" ""
 PENS
 "ice" 1.0 0 -7500403 true "" "histogram [ice] of patches with [ice > 0]"
+"water" 1.0 0 -13345367 true "" "histogram [water] of patches with [water > 0]"
 
 TEXTBOX
 757
@@ -431,24 +370,6 @@ TEXTBOX
 105.0
 1
 
-PLOT
-1046
-83
-1312
-275
-Histogram water
-[cm]
-NIL
-0.0
-100.0
-0.0
-10.0
-true
-true
-";set-plot-x-range 0 (mean-ice-height * 2)\n;set-plot-y-range 0 100" ""
-PENS
-"water" 1.0 0 -13345367 true "" "histogram [water] of patches with [water > 0]"
-
 BUTTON
 15
 423
@@ -467,12 +388,12 @@ NIL
 1
 
 PLOT
-758
-315
-1030
-523
+756
+100
+1037
+308
 Average heights [cm]
-time [ticks]
+time [day]
 NIL
 0.0
 10.0
@@ -482,8 +403,8 @@ true
 true
 "set-plot-y-range 0 mean-ice-height" ""
 PENS
-"ice" 1.0 0 -7500403 true "" "plot compute-mean-ice"
-"water" 1.0 0 -13345367 true "" "plot compute-mean-water"
+"ice" 1.0 0 -7500403 true "" "plotxy (ticks * time-step) compute-mean-ice"
+"water" 1.0 0 -13345367 true "" "plotxy (ticks * time-step) compute-mean-water"
 
 TEXTBOX
 1050
@@ -507,12 +428,12 @@ compute-mean-water
 11
 
 PLOT
-1049
-315
-1331
-524
+756
+316
+1038
+525
 relative coverage [%]
-NIL
+time [day]
 NIL
 0.0
 10.0
@@ -522,15 +443,15 @@ true
 true
 "" ""
 PENS
-"water" 1.0 0 -13345367 true "" "plot 100 * (count patches with [water > 0]) / count patches"
-"ice" 1.0 0 -7500403 true "" "plot 100 * (count patches with [ice > 0] ) / count patches"
-"holes" 1.0 0 -2674135 true "" "plot 100 * (count patches with [ice = 0] ) / count patches"
+"water" 1.0 0 -13345367 true "" "plotxy (ticks * time-step) 100 * (count patches with [water > 0]) / count patches"
+"ice" 1.0 0 -7500403 true "" "plotxy (ticks * time-step) 100 * (count patches with [ice > 0] ) / count patches"
+"holes" 1.0 0 -2674135 true "" "plotxy (ticks * time-step) 100 * (count patches with [ice = 0] ) / count patches"
 
 MONITOR
-1061
-554
-1325
-599
+768
+555
+1032
+600
 Time to 100%  sea-water coverage [days]
 (ticks - 1) * time-step
 17
@@ -622,17 +543,6 @@ pen-down?
 -1000
 
 SWITCH
-172
-552
-326
-585
-lateral-melting?
-lateral-melting?
-1
-1
--1000
-
-SWITCH
 16
 552
 151
@@ -644,9 +554,9 @@ melt-ponds?
 -1000
 
 SWITCH
-344
+162
 552
-457
+275
 585
 seepage?
 seepage?
