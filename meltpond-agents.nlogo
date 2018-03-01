@@ -296,7 +296,7 @@ smooth-cycles
 smooth-cycles
 0
 40
-13.0
+3.0
 1
 1
 NIL
