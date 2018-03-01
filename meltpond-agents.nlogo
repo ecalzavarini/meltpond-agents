@@ -4,7 +4,6 @@ globals[
   density-ratio
   melt-rate
   melt-rate-pond
-  melt-rate-pond-lateral
   seepage-rate
 
 
@@ -26,16 +25,14 @@ drops-own[water-content]
 
 ;; we affect the global physical parameters that are relevant for the model
 to startup
-  set time-step (1 / 4)  ; expressed in days
+  set time-step  1  ; expressed in days
   set space-step 1.0  ; the lateral size of a patch expressed in cm
 
   set melt-rate 1.2  ;in cm of ice per day
   ifelse melt-ponds? [
     set melt-rate-pond melt-rate + 0.8 ; nominal value, check the literature
-    set melt-rate-pond-lateral melt-rate-pond
   ][
     set melt-rate-pond melt-rate
-    set melt-rate-pond-lateral melt-rate
   ]
   set density-ratio 0.8 ;ratio between ice and water mass densities , for less porous ice can be 0.9
 
@@ -62,7 +59,8 @@ to setup-topography
     smooth-ice-with-radius][
     smooth-ice-with-cycles]
   reset-ticks
-  tick
+  tick ;this is to enable the plotting of th histogram of the initial configuration
+  reset-ticks
 end
 
 ; this is the function to smooth the random ice field
@@ -189,6 +187,8 @@ end
 
 ; this is the procedure for the loop over time
 to melt-and-flow
+  if pen-down? [cd] ; to clear previous drawings
+
   ask patches[
     ;; melt the ice
     melt-ice
@@ -432,7 +432,7 @@ PLOT
 316
 1038
 525
-relative coverage [%]
+Relative coverage [%]
 time [day]
 NIL
 0.0
@@ -453,7 +453,7 @@ MONITOR
 1032
 600
 Time to 100%  sea-water coverage [days]
-(ticks - 1) * time-step
+ticks  * time-step
 17
 1
 11
@@ -467,7 +467,7 @@ smooth-radius
 smooth-radius
 0
 10
-6.0
+2.5
 0.5
 1
 NIL
