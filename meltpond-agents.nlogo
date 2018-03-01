@@ -208,7 +208,7 @@ end
 ; move drops till conversion into water
 to flow
   loop[
-  let p min-one-of neighbors [ice + water]
+  let p min-one-of neighbors4 [ice + water]
    ifelse (ice + water) >  [ice + water] of p [
       move-to p
     ][
@@ -219,10 +219,26 @@ to flow
   ]
 end
 
-; discharge of water to the sea
-;to discharge
-;  if any? neighbors with [ice = 0] [set water 0] ; discharge of water to the sea is occurred
-;end
+; alternative way of moving the melt water
+to flow2
+  hide-turtle
+  let p min-one-of neighbors4 [ice + water]
+  ifelse (ice + water) >  [ice + water] of p [
+    set heading towards p
+    let vel ( [ice + water] of p - (ice + water)) / space-step
+    ;fd (vel * time-step)
+    fd 10 * vel * time-step
+  ][
+    set water (water + water-content) ; the pocket of melted water has reached a minimum height and it remains there
+    if ice = 0 [set water 0]
+    die
+  ]
+  ;set water (water + water-content) ; the pocket of melted water has reached a minimum height and it remains there
+  ;die
+end
+
+
+
 
 to seepage
   if water > 0 [
@@ -234,18 +250,18 @@ end
 ; this is the procedure for the loop over time
 to melt-and-flow
   ask patches[
-    ; melt the ice
+    ;; melt the ice
     melt-ice
-    ; seepage of meltwater
+    ;; seepage of meltwater
     seepage
   ]
   ask drops [
-    ; move water
+    ;; move water
     flow
+    ;flow2
   ]
   ask patches[
-    ; discharge metlwater
-    ;discharge
+    ;; recoloring the map
     color-field
   ]
 
@@ -339,7 +355,7 @@ smooth-cycles
 smooth-cycles
 0
 40
-22.0
+6.0
 1
 1
 NIL
