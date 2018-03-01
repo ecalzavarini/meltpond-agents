@@ -176,15 +176,6 @@ to flow2
 end
 
 
-
-
-to seepage
-  if water > 0 [
-    set water water - seepage-rate * time-step
-    if water < 0 [set water 0]
-  ]
-end
-
 ; this is the procedure for the loop over time
 to melt-and-flow
   if pen-down? [cd] ; to clear previous drawings
@@ -549,7 +540,7 @@ SWITCH
 585
 melt-ponds?
 melt-ponds?
-0
+1
 1
 -1000
 
