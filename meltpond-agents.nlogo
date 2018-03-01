@@ -18,7 +18,7 @@ breed[drops drop]
 ; "ice" is ice height in [cm]
 ; "water" is the melt water in [cm]
 ; "melt" represents the water recently melted in [cm]
-patches-own[ice water]
+patches-own[ice water albedo]
 
 drops-own[water-content]
 
@@ -29,11 +29,7 @@ to startup
   set space-step 1.0  ; the lateral size of a patch expressed in cm
 
   set melt-rate 1.2  ;in cm of ice per day
-  ifelse melt-ponds? [
-    set melt-rate-pond melt-rate + 0.8 ; nominal value, check the literature
-  ][
-    set melt-rate-pond melt-rate
-  ]
+  set melt-rate-pond melt-rate + 0.8 ; nominal value, check the literature
   set density-ratio 0.8 ;ratio between ice and water mass densities , for less porous ice can be 0.9
 
   ifelse seepage? [
@@ -52,6 +48,7 @@ to setup-topography
   [
   set ice random-float (2 * mean-ice-height)
   set water 0
+  set albedo compute-albedo
 
   set pcolor scale-color cyan ice 0 (2 * mean-ice-height)
   ]
@@ -151,8 +148,9 @@ to flow
       move-to p
     ][
      set water (water + water-content) ; the pocket of melted water has reached a minimum height and it remains there
-      if ice = 0 [set water 0]
-     die
+     if ice = 0 [set water 0]
+     if not melt-ponds? [set water 0] ; remove all water if we are not interested in ponds
+      die
   ]
   ]
 end
@@ -192,6 +190,8 @@ to melt-and-flow
   ask patches[
     ;; recoloring the map
     color-field
+    ;; estimate albedo
+    set albedo compute-albedo
   ]
 
   if (count patches with [ice = 0] = count patches )[stop]
@@ -214,6 +214,18 @@ to-report compute-std-ice
   let avg compute-mean-ice
   let var (mean [ice * ice] of patches)
   report sqrt (var - ( avg * avg ))
+end
+
+to-report compute-albedo
+  let alpha 0
+  if ice > 0 [
+  ifelse water > 0 [
+    set alpha 0.9 * exp (- water)
+    ][
+    set alpha 0.9
+    ]
+  ]
+  report alpha
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -284,7 +296,7 @@ smooth-cycles
 smooth-cycles
 0
 40
-3.0
+13.0
 1
 1
 NIL
@@ -436,7 +448,7 @@ true
 PENS
 "water" 1.0 0 -13345367 true "" "plotxy (ticks * time-step) 100 * (count patches with [water > 0]) / count patches"
 "ice" 1.0 0 -7500403 true "" "plotxy (ticks * time-step) 100 * (count patches with [ice > 0] ) / count patches"
-"holes" 1.0 0 -2674135 true "" "plotxy (ticks * time-step) 100 * (count patches with [ice = 0] ) / count patches"
+"sea" 1.0 0 -14835848 true "" "plotxy (ticks * time-step) 100 * (count patches with [ice = 0] ) / count patches"
 
 MONITOR
 768
@@ -554,6 +566,24 @@ seepage?
 0
 1
 -1000
+
+PLOT
+1056
+316
+1328
+526
+mean albedo
+NIL
+NIL
+0.0
+10.0
+0.0
+1.0
+true
+false
+"" ""
+PENS
+"default" 1.0 0 -2674135 true "" "plotxy (ticks * time-step) mean [albedo] of patches"
 
 @#$#@#$#@
 # SUMMER MELTING OF ARCTIC SEA-ICE SHEETS 
