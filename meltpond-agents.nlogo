@@ -26,7 +26,7 @@ drops-own[water-content]
 
 ;; we affect the global physical parameters that are relevant for the model
 to startup
-  set time-step 0.25  ; expressed in days
+  set time-step (1 / 4)  ; expressed in days
   set space-step 1.0  ; the lateral size of a patch expressed in cm
 
   set melt-rate 1.2  ;in cm of ice per day
@@ -37,7 +37,7 @@ to startup
     set melt-rate-pond melt-rate
     set melt-rate-pond-lateral melt-rate
   ]
-  set density-ratio 0.9 ;ratio between ice and water mass densities
+  set density-ratio 0.8 ;ratio between ice and water mass densities , for less porous ice can be 0.9
 
   ifelse seepage? [
   set seepage-rate 0.8 ; in cm / day
@@ -235,7 +235,10 @@ end
 to melt-and-flow
   ask patches[
     ; melt the ice
-    melt-ice]
+    melt-ice
+    ; seepage of meltwater
+    seepage
+  ]
   ask drops [
     ; move water
     flow
@@ -243,8 +246,6 @@ to melt-and-flow
   ask patches[
     ; discharge metlwater
     ;discharge
-    ; seepage of meltwater
-    seepage
     color-field
   ]
 
@@ -338,7 +339,7 @@ smooth-cycles
 smooth-cycles
 0
 40
-8.0
+22.0
 1
 1
 NIL
@@ -622,7 +623,7 @@ SWITCH
 585
 melt-ponds?
 melt-ponds?
-1
+0
 1
 -1000
 
