@@ -4,12 +4,12 @@ globals[
   density-ratio
   melt-rate
   melt-rate-pond
+  water-height-transition
   seepage-rate
-
 
   ;; physical parameters for the model
   time-step
-  space-step
+  space-step ; not used for the moment
 ]
 
 breed[drops drop]
@@ -18,18 +18,19 @@ breed[drops drop]
 ; "ice" is ice height in [cm]
 ; "water" is the melt water in [cm]
 ; "melt" represents the water recently melted in [cm]
+; "albedo" the fraction of radiation reflected by the surface
 patches-own[ice water albedo]
 
 drops-own[water-content]
 
-
 ;; we affect the global physical parameters that are relevant for the model
 to startup
-  set time-step  1  ; expressed in days
+  set time-step  0.5  ; expressed in days
   set space-step 1.0  ; the lateral size of a patch expressed in cm
 
   set melt-rate 1.2  ;in cm of ice per day
-  set melt-rate-pond melt-rate + 0.8 ; nominal value, check the literature
+  set melt-rate-pond 2.0 ;in cm of ice per day, nominal value, check the literature
+  set water-height-transition 10 ;in cm
   set density-ratio 0.8 ;ratio between ice and water mass densities , for less porous ice can be 0.9
 
   ifelse seepage? [
@@ -42,7 +43,7 @@ end
 
 ; generate a random smooth topography
 to setup-topography
-  clear-all
+  if clear-all? [clear-all]
   startup
    ask patches
   [
@@ -103,8 +104,6 @@ end
 
 
 
-
-
 ; melt ice
 to melt-ice
   let actual-melted-volume 0
@@ -113,17 +112,21 @@ to melt-ice
 
     ;; 1) the following line implements conductive melting of ice
     if water = 0 [
-       set actual-melted-volume  melt-rate * time-step ;shall be corrected to include Stefan effect, see line below
-      ;set actual-melted-volume  ( melt-rate * time-step / ice )
+      set actual-melted-volume  melt-rate * time-step ;shall be corrected to include Stefan effect, see line below
+      ;set actual-melted-volume  ( melt-rate * time-step / ice * mean-ice-height )
     ]
 
-    ;; 2) the following line implements the increased melt-rate for pondend ice : water enahnces melting
+    ;; 2) the following line implements the increased melt-rate for pondend ice : water enahnces melting (as in Luethje et al. paper)
     if water > 0 [
+      ifelse water < water-height-transition[
+      set actual-melted-volume (melt-rate +  (melt-rate-pond - melt-rate) * (water / water-height-transition)  )* time-step
+      ][
       set actual-melted-volume melt-rate-pond * time-step
+      ]
     ]
 
 
-    ;; Making meting happening
+    ;; Making melting happening
     if actual-melted-volume > ice [
       set actual-melted-volume ice  ;this is to avoid to melt more ice than what we have
       set water 0
@@ -155,23 +158,6 @@ to flow
   ]
 end
 
-; alternative way of moving the melt water
-to flow2
-  hide-turtle
-  let p min-one-of neighbors4 [ice + water]
-  ifelse (ice + water) >  [ice + water] of p [
-    set heading towards p
-    let vel ( [ice + water] of p - (ice + water)) / space-step
-    ;fd (vel * time-step)
-    fd 10 * vel * time-step
-  ][
-    set water (water + water-content) ; the pocket of melted water has reached a minimum height and it remains there
-    if ice = 0 [set water 0]
-    die
-  ]
-  ;set water (water + water-content) ; the pocket of melted water has reached a minimum height and it remains there
-  ;die
-end
 
 
 ; this is the procedure for the loop over time
@@ -185,7 +171,6 @@ to melt-and-flow
   ask drops [
     ;; move water
     flow
-    ;flow2
   ]
   ask patches[
     ;; recoloring the map
@@ -217,12 +202,12 @@ to-report compute-std-ice
 end
 
 to-report compute-albedo
-  let alpha 0
+  let alpha 0  ; we start from total absorption (like if there is sea everywhere)
   if ice > 0 [
   ifelse water > 0 [
-    set alpha 0.9 * exp (- water)
+    set alpha 0.9 * exp (- water) ; albedo coeff of pond
     ][
-    set alpha 0.9
+    set alpha 0.9 ; albedo coeff of ice
     ]
   ]
   report alpha
@@ -552,7 +537,7 @@ SWITCH
 585
 melt-ponds?
 melt-ponds?
-1
+0
 1
 -1000
 
@@ -584,6 +569,17 @@ false
 "" ""
 PENS
 "default" 1.0 0 -2674135 true "" "plotxy (ticks * time-step) mean [albedo] of patches"
+
+SWITCH
+18
+301
+131
+334
+clear-all?
+clear-all?
+0
+1
+-1000
 
 @#$#@#$#@
 # SUMMER MELTING OF ARCTIC SEA-ICE SHEETS 
