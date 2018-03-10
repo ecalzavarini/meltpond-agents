@@ -43,7 +43,7 @@ end
 
 ; generate a random smooth topography
 to setup-topography
-  if clear-all? [clear-all]
+  if clear-previous-plots? [clear-all]
   startup
    ask patches
   [
@@ -205,7 +205,7 @@ to-report compute-albedo
   let alpha 0  ; we start from total absorption (like if there is sea everywhere)
   if ice > 0 [
   ifelse water > 0 [
-    set alpha 0.9 * exp (- water) ; albedo coeff of pond
+    set alpha 0.9 * exp (- water / water-height-transition) ; albedo coeff of pond
     ][
     set alpha 0.9 ; albedo coeff of ice
     ]
@@ -558,7 +558,7 @@ PLOT
 1328
 526
 mean albedo
-NIL
+time [day]
 NIL
 0.0
 10.0
@@ -571,15 +571,25 @@ PENS
 "default" 1.0 0 -2674135 true "" "plotxy (ticks * time-step) mean [albedo] of patches"
 
 SWITCH
-18
+13
 301
-131
+205
 334
-clear-all?
-clear-all?
+clear-previous-plots?
+clear-previous-plots?
 0
 1
 -1000
+
+TEXTBOX
+17
+532
+234
+562
+physical processes in the model :
+12
+95.0
+1
 
 @#$#@#$#@
 # SUMMER MELTING OF ARCTIC SEA-ICE SHEETS 
@@ -593,7 +603,7 @@ This is a highly idealized (toy?) model system for the evolution of melting dyna
 2. The water flows to the positions of local minima of potential energy, that is to say to positions where the sum of the ice thickness and the depth of melt water is minimum.
 The water displacement process is assumed to occur over a time scale that is much smaller as compared to the time scale of the melting. This hypothesis allows to treat water down-slope movment as an istantaneous process.
 3. When the ice thickness becomes zero, the melt water at the same location is taken out from the system. This feature of the model reproduces the discharge of fresh water at sea. 
-
+4. seepage is accounted for
 
 ## HOW IT WORKS
 
