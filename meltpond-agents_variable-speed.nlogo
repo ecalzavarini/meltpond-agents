@@ -20,6 +20,8 @@ globals[
   ;utility variables
   max1
   max2
+  initial-mean-ice
+  time-to-half-of-initial-mean-ice
 ]
 
 breed[drops drop]
@@ -58,6 +60,7 @@ to startup
 
   set max1 0
   set max2 0
+  set time-to-half-of-initial-mean-ice 0
 end
 
 
@@ -76,6 +79,9 @@ to setup-topography
   ifelse(smooth-with-radius?) [
     smooth-ice-with-radius][
     smooth-ice-with-cycles]
+
+  set initial-mean-ice compute-mean-ice
+
   reset-ticks
   tick ;this is to enable the plotting of the histogram of the initial configuration
   reset-ticks
@@ -256,8 +262,8 @@ to-report lateral-melting
 end
 
 
-
-; this is the procedure for the loop over time
+;; MAIN
+;; this is the procedure for the loop over time
 to melt-and-flow
   if pen-down? [cd] ; to clear previous drawings
 
@@ -281,11 +287,11 @@ to melt-and-flow
     set albedo compute-albedo
   ]
 
-  if (count patches with [ice = 0] = count patches )[stop]
+  if (count patches with [ice = 0] = count patches )[
+    stop
+  ]
   tick
 end
-
-
 
 ; reports used in plots
 to-report compute-mean-ice
@@ -308,7 +314,7 @@ to-report compute-std-ice
   report sqrt (var - ( avg * avg ))
 end
 
-; we need to correct this, just a test
+; we need to improve this, it's just for test
 to-report compute-albedo
   let alpha albedo-sea-water  ; we start from total absorption (like if there is sea everywhere)
   if ice > 0 [
@@ -326,6 +332,13 @@ to-report max-pond-coverage
   let value 100 * (count patches with [water > 0]) / count patches
   if value > max1 [set max1 value]
   report max1
+end
+
+to-report time-to-50%-ice-melt
+  if compute-mean-ice <  0.5 * initial-mean-ice and time-to-half-of-initial-mean-ice = 0 [
+    set time-to-half-of-initial-mean-ice (ticks * time-step)
+  ]
+    report time-to-half-of-initial-mean-ice
 end
 @#$#@#$#@
 GRAPHICS-WINDOW
@@ -458,7 +471,7 @@ TEXTBOX
 12
 764
 56
-Arctic sea-ice evolution: melting, seepage and pond formation
+Arctic sea-ice evolution: melting, seepage, pond formation and albedo
 18
 0.0
 1
@@ -506,8 +519,8 @@ true
 true
 "set-plot-y-range 0 mean-ice-height" ""
 PENS
-"ice" 1.0 0 -7500403 true "" "plotxy (ticks * time-step) compute-mean-ice"
-"water" 1.0 0 -13345367 true "" "plotxy (ticks * time-step) compute-mean-water"
+"ice" 1.0 2 -7500403 true "" "plot-pen-down\nplotxy (ticks * time-step) compute-mean-ice\nplot-pen-up"
+"water" 1.0 2 -13345367 true "" "plotxy (ticks * time-step) compute-mean-water"
 
 TEXTBOX
 1050
@@ -546,16 +559,16 @@ true
 true
 "" ""
 PENS
-"water" 1.0 0 -13345367 true "" "plotxy (ticks * time-step) 100 * (count patches with [water > 0]) / count patches"
-"ice" 1.0 0 -7500403 true "" "plotxy (ticks * time-step) 100 * (count patches with [ice > 0] ) / count patches"
-"sea" 1.0 0 -14835848 true "" "plotxy (ticks * time-step) 100 * (count patches with [ice = 0] ) / count patches"
+"water" 1.0 2 -13345367 true "" "plotxy (ticks * time-step) 100 * (count patches with [water > 0]) / count patches"
+"ice" 1.0 2 -7500403 true "" "plotxy (ticks * time-step) 100 * (count patches with [ice > 0] ) / count patches"
+"sea" 1.0 2 -14835848 true "" "plotxy (ticks * time-step) 100 * (count patches with [ice = 0] ) / count patches"
 
 MONITOR
-874
-580
-1024
-625
-Time to 100% melt [days]
+849
+577
+1017
+622
+Time to 100% ice melt [days]
 ticks  * time-step
 17
 1
@@ -683,7 +696,7 @@ true
 true
 "" ""
 PENS
-"mean" 1.0 0 -2674135 true "" "plotxy (ticks * time-step) mean [albedo] of patches"
+"mean" 1.0 2 -2674135 true "" "plotxy (ticks * time-step) mean [albedo] of patches"
 "ice" 1.0 0 -7500403 true "" "plotxy (ticks * time-step) albedo-ice"
 "sea " 1.0 0 -14835848 true "" "plotxy (ticks * time-step) albedo-sea-water"
 
@@ -709,11 +722,11 @@ TEXTBOX
 1
 
 MONITOR
-1184
-590
-1327
-627
-diagnostoic count drops
+1154
+584
+1329
+621
+code diagnostoic: count drops
 count drops
 17
 1
@@ -730,10 +743,10 @@ water-flowing-mode
 0
 
 MONITOR
-874
-530
-997
-575
+1029
+534
+1152
+579
 Max pond cover [%]
 max-pond-coverage
 2
@@ -803,9 +816,20 @@ SWITCH
 400
 pond-lateral-melting?
 pond-lateral-melting?
-1
+0
 1
 -1000
+
+MONITOR
+848
+529
+1017
+574
+Time to 50% ice melt [days]
+time-to-50%-ice-melt
+17
+1
+11
 
 @#$#@#$#@
 # SUMMER MELTING OF ARCTIC SEA-ICE SHEETS 
@@ -819,7 +843,8 @@ This is a highly idealized (toy?) model system for the evolution of melting dyna
 2. The water flows to the positions of local minima of potential energy, that is to say to positions where the sum of the ice thickness and the depth of melt water is minimum.
 The water displacement process is assumed to occur over a time scale that is much smaller as compared to the time scale of the melting. This hypothesis allows to treat water down-slope movment as an istantaneous process.
 3. When the ice thickness becomes zero, the melt water at the same location is taken out from the system. This feature of the model reproduces the discharge of fresh water at sea. 
-4. seepage is accounted for
+4. Seepage is accounted for by removing water from the system at a rescribed rate.
+5. It is possible to allow ponds to melt ice not only at the bottom but also on the sides.
 
 ## HOW IT WORKS
 
@@ -841,22 +866,23 @@ There are two functions that can be used to implement
 
 ## THINGS TO TRY
 
-(suggested things for the user to try to do (move sliders, switches, etc.) with the model)
+1. Try to vary the level of smoothing of the initial topography and look the evolution 
+of ice melt and the resulting albedo 
+
+2. observe the effect of lateral melting due to ponds (reducing space-step should enhance the effect)
 
 ## EXTENDING THE MODEL
 
-(suggested things to add or change in the Code tab to make the model more complicated, detailed, accurate, etc.)
+The melting-rate function can be changed to allows for a more realistic melting procedure.
 
 ## NETLOGO FEATURES
 
-(interesting or unusual features of NetLogo that the model uses, particularly in the Code tab; or where workarounds were needed for missing features)
+
 
 ## RELATED MODELS
 
 The present is largely inspired from [1]
 
-
-(models in the NetLogo Models Library and elsewhere which are of related interest)
 
 ## CREDITS AND REFERENCES
 
